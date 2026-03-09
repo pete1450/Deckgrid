@@ -1,6 +1,6 @@
 # Deckgrid
 
-A virtual Stream Deck for controlling OBS Studio. Deckgrid is a desktop application built with Electron that gives you a fully customizable button grid connected to OBS via WebSocket.
+A virtual Stream Deck for controlling OBS Studio. Deckgrid is a desktop application built with Electron that gives you a fully customizable button grid connected to OBS via WebSocket. It is meant to be used on an attached touchscreen but also has a remote page that can be hosted and accessed via a mobile device.
 
 I didn't like any of the other options that either cost too much or had annoying bugs. Threw it together with some copilot help.
 
