@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Content Security Policy: no external sources needed (all assets bundled) -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+             style-src 'self' 'unsafe-inline';
+             font-src 'self' data:;
+             img-src 'self' data: blob:;
+             script-src 'self';
+             connect-src 'none';" />
+  <title>Deckgrid</title>
+  <link rel="stylesheet"
+        href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ── Top Bar ─────────────────────────────────────────────────────── -->
+    <div id="topbar">
+      <div class="topbar-left">
+        <button id="mode-toggle" class="btn-mode ops" title="Toggle edit / operations mode">
+          <i class="fa-solid fa-play"></i>
+          <span>Operations</span>
+        </button>
+      </div>
+
+      <div id="grid-controls" class="topbar-center hidden">
+        <label class="control-label">
+          <span>Cols</span>
+          <input type="number" id="grid-cols" min="1" max="12" value="4" />
+        </label>
+        <label class="control-label">
+          <span>Rows</span>
+          <input type="number" id="grid-rows" min="1" max="8" value="3" />
+        </label>
+        <label class="control-label zoom-label">
+          <span>Zoom</span>
+          <input type="range" id="grid-zoom" min="40" max="300" value="100" />
+          <span id="zoom-value">100%</span>
+        </label>
+        <div class="controls-sep"></div>
+        <button id="export-btn" class="btn-secondary" title="Export config to file">
+          <i class="fa-solid fa-file-export"></i><span>Export</span>
+        </button>
+        <button id="import-btn" class="btn-secondary" title="Import config from file">
+          <i class="fa-solid fa-file-import"></i><span>Import</span>
+        </button>
+        <input type="file" id="import-file-input" accept=".json" style="display:none" />
+      </div>
+
+      <div class="topbar-right">
+        <div id="connection-status" class="conn-status disconnected" title="OBS connection status">
+          <i class="fa-solid fa-circle status-dot"></i>
+          <span id="conn-text">Not Connected</span>
+        </div>
+        <button id="connect-btn" class="btn-secondary">
+          <i class="fa-solid fa-plug"></i>
+          <span>Connect to OBS</span>
+        </button>
+        <button id="remote-btn" class="btn-secondary" title="Remote control server">
+          <i class="fa-solid fa-tower-broadcast"></i>
+          <span>Remote</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Grid Area ──────────────────────────────────────────────────── -->
+    <div id="grid-container">
+      <div id="grid-scaler">
+        <div id="grid"></div>
+      </div>
+    </div>
+
+    <!-- ── Page Bar ───────────────────────────────────────────────────── -->
+    <div id="page-bar"></div>
+
+    <!-- ── OBS Connect Modal ──────────────────────────────────────────── -->
+    <div id="obs-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="obs-modal-title">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h2 id="obs-modal-title"><i class="fa-solid fa-plug"></i> Connect to OBS</h2>
+          <button class="modal-close" id="obs-modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="obs-host">Host</label>
+            <input type="text" id="obs-host" value="localhost" placeholder="localhost" />
+          </div>
+          <div class="form-group">
+            <label for="obs-port">Port</label>
+            <input type="number" id="obs-port" value="4455" min="1" max="65535" />
+          </div>
+          <div class="form-group">
+            <label for="obs-password">Password</label>
+            <input type="password" id="obs-password" placeholder="(leave blank if none)" />
+          </div>
+          <p id="obs-error" class="error-msg hidden"></p>
+        </div>
+        <div class="modal-footer">
+          <button id="obs-cancel" class="btn-secondary">Cancel</button>
+          <button id="obs-connect" class="btn-primary">
+            <i class="fa-solid fa-plug"></i> Connect
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Button Editor Modal ────────────────────────────────────────── -->
+    <div id="editor-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="editor-modal-title">
+      <div class="modal-box editor-box">
+        <div class="modal-header">
+          <h2 id="editor-modal-title"><i class="fa-solid fa-pen-to-square"></i> Edit Button</h2>
+          <button class="modal-close" id="editor-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body editor-body">
+
+          <!-- Left column: action config -->
+          <div class="editor-col editor-action-col">
+            <h3 class="section-heading">Action</h3>
+
+            <div class="form-group">
+              <label for="action-type">Action Type</label>
+              <select id="action-type">
+                <option value="">No Action</option>
+                <option value="scene">Switch Scene</option>
+                <option value="toggleSource">Toggle Source</option>
+                <option value="studioModeTransition">Studio Mode Transition</option>
+                <option value="navigatePage">Navigate to Page</option>
+              </select>
+            </div>
+
+            <div id="scene-picker" class="form-group hidden">
+              <label for="action-scene">Scene</label>
+              <select id="action-scene">
+                <option value="">Select a scene…</option>
+              </select>
+            </div>
+
+            <div id="source-picker" class="form-group hidden">
+              <label for="action-source">Source</label>
+              <select id="action-source">
+                <option value="">Select a source…</option>
+              </select>
+            </div>
+
+            <div id="page-index-picker" class="form-group hidden">
+              <label for="action-target-page">Target Page</label>
+              <select id="action-target-page">
+                <option value="">Select a page…</option>
+              </select>
+            </div>
+
+            <p id="action-obs-hint" class="hint-text hidden">
+              <i class="fa-solid fa-circle-info"></i>
+              Connect to OBS to pick scenes and sources.
+            </p>
+
+            <div class="form-group">
+              <label for="hotkey-input">Hotkey <span class="label-hint">(global shortcut)</span></label>
+              <div class="hotkey-input-row">
+                <input type="text" id="hotkey-input" class="hotkey-input" readonly
+                       placeholder="Click to set…" autocomplete="off" />
+                <button type="button" id="hotkey-clear" class="btn-danger btn-sm hidden"
+                        title="Clear hotkey" aria-label="Clear hotkey">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right column: visual config -->
+          <div class="editor-col editor-visual-col">
+            <div class="visual-header">
+              <h3 class="section-heading">Appearance</h3>
+              <div class="state-toggle" role="group" aria-label="Button state">
+                <button class="state-btn active-tab" id="state-active-btn" data-state="active">
+                  Active
+                </button>
+                <button class="state-btn" id="state-inactive-btn" data-state="inactive">
+                  Inactive
+                </button>
+              </div>
+            </div>
+
+            <!-- Visual form (shared for both states, values swapped on toggle) -->
+            <div class="visual-form">
+              <div class="form-group">
+                <label for="vis-text">Button Text</label>
+                <input type="text" id="vis-text" placeholder="Label shown on button" maxlength="60" />
+              </div>
+
+              <div class="form-row color-row">
+                <div class="form-group">
+                  <label for="vis-bg-color">Background</label>
+                  <input type="color" id="vis-bg-color" value="#1e2a4a" />
+                </div>
+                <div class="form-group">
+                  <label for="vis-border-color">Border</label>
+                  <input type="color" id="vis-border-color" value="#3a4a6a" />
+                </div>
+                <div class="form-group">
+                  <label for="vis-text-color">Text Color</label>
+                  <input type="color" id="vis-text-color" value="#ffffff" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Text Position</label>
+                <div class="radio-group" role="group">
+                  <label class="radio-label">
+                    <input type="radio" name="vis-text-pos" value="top" />
+                    <i class="fa-solid fa-arrow-up"></i> Top
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="vis-text-pos" value="center" checked />
+                    <i class="fa-solid fa-align-center"></i> Center
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="vis-text-pos" value="bottom" />
+                    <i class="fa-solid fa-arrow-down"></i> Bottom
+                  </label>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="vis-icon">Icon <span class="label-hint">(Font Awesome name, e.g. <code>video</code>)</span></label>
+                <div class="icon-input-row">
+                  <span class="icon-preview" id="vis-icon-preview" aria-hidden="true"></span>
+                  <input type="text" id="vis-icon" placeholder="video, microphone, gamepad…" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Image</label>
+                <div class="image-input-row">
+                  <button type="button" id="vis-image-btn" class="btn-secondary btn-sm">
+                    <i class="fa-solid fa-image"></i> Select Image
+                  </button>
+                  <button type="button" id="vis-image-clear" class="btn-danger btn-sm hidden">
+                    <i class="fa-solid fa-trash"></i> Remove
+                  </button>
+                </div>
+                <img id="vis-image-preview" class="image-preview hidden" alt="Button image preview" />
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /.modal-body -->
+        <div class="modal-footer editor-footer">
+          <button id="editor-delete" class="btn-danger">
+            <i class="fa-solid fa-trash"></i> Delete Button
+          </button>
+          <div class="footer-actions">
+            <button id="editor-cancel" class="btn-secondary">Cancel</button>
+            <button id="editor-save" class="btn-primary">
+              <i class="fa-solid fa-floppy-disk"></i> Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /#editor-modal -->
+
+    <!-- ── Remote Control Modal ──────────────────────────────────────── -->
+    <div id="remote-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="remote-modal-title">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h2 id="remote-modal-title"><i class="fa-solid fa-tower-broadcast"></i> Remote Control</h2>
+          <button class="modal-close" id="remote-modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="remote-port">Port</label>
+            <input type="number" id="remote-port" value="8765" min="1024" max="65535" />
+          </div>
+          <div id="remote-status-section" class="hidden">
+            <p class="hint-text">
+              <i class="fa-solid fa-circle-info"></i>
+              Connect remote devices using one of these addresses:
+            </p>
+            <ul id="remote-addresses" class="remote-addresses"></ul>
+            <p class="hint-text">Connected clients: <span id="remote-client-count">0</span></p>
+          </div>
+          <p id="remote-error" class="error-msg hidden"></p>
+        </div>
+        <div class="modal-footer">
+          <button id="remote-modal-close-btn" class="btn-secondary">Close</button>
+          <button id="remote-stop" class="btn-danger hidden">
+            <i class="fa-solid fa-stop"></i> Stop Server
+          </button>
+          <button id="remote-start" class="btn-primary">
+            <i class="fa-solid fa-play"></i> Start Server
+          </button>
+        </div>
+      </div>
+    </div><!-- /#remote-modal -->
+
+  </div><!-- /#app -->
+
+  <script src="app.js"></script>
+</body>
+</html>

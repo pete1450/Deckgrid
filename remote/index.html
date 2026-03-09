@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deckgrid Remote</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-app:      #0f0f1a;
+      --bg-panel:    #16192e;
+      --bg-card:     #1e2340;
+      --bg-hover:    #252b4a;
+      --bg-input:    #111424;
+
+      --color-accent:  #4a9eff;
+      --color-green:   #00c87a;
+      --color-red:     #ff4757;
+      --color-orange:  #ffa048;
+
+      --text-primary:   #e8eaf2;
+      --text-secondary: #7a85a8;
+      --text-dim:       #4a5280;
+
+      --border-subtle: #252b4a;
+      --border-strong: #3a4268;
+
+      --radius-sm: 4px;
+      --radius-md: 8px;
+
+      --transition: 0.15s ease;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      background: var(--bg-app);
+      color: var(--text-primary);
+      overflow-x: hidden;
+    }
+
+    /* ── Connect Screen ────────────────────────────────────────────────────── */
+    #connect-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 24px;
+      padding: 24px;
+    }
+
+    #connect-screen.hidden { display: none; }
+
+    .connect-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .connect-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-accent);
+    }
+
+    .connect-logo i { font-size: 26px; }
+
+    .connect-subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: -12px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .field input {
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    .field input:focus { border-color: var(--color-accent); }
+
+    .btn-connect {
+      padding: 11px;
+      border-radius: var(--radius-md);
+      border: none;
+      background: var(--color-accent);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: filter var(--transition);
+    }
+
+    .btn-connect:hover { filter: brightness(1.15); }
+    .btn-connect:active { filter: brightness(0.9); }
+    .btn-connect:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #connect-error {
+      font-size: 13px;
+      color: var(--color-red);
+      text-align: center;
+      min-height: 18px;
+    }
+
+    /* ── Dashboard ─────────────────────────────────────────────────────────── */
+    #dashboard {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    #dashboard.hidden { display: none; }
+
+    /* Top bar */
+    #topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 16px;
+      height: 52px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .topbar-left { display: flex; align-items: center; gap: 8px; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+
+    .app-logo {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--color-accent);
+      letter-spacing: 0.03em;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .remote-badge {
+      font-size: 10px;
+      font-weight: 600;
+      background: rgba(74,158,255,0.15);
+      color: var(--color-accent);
+      border: 1px solid rgba(74,158,255,0.3);
+      border-radius: var(--radius-sm);
+      padding: 2px 7px;
+      letter-spacing: 0.04em;
+    }
+
+    /* Connection status pill */
+    .conn-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .conn-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .conn-dot.connected    { background: var(--color-green); box-shadow: 0 0 5px var(--color-green); }
+    .conn-dot.disconnected { background: var(--color-red); }
+    .conn-dot.connecting   { background: var(--color-orange); animation: pulse 1s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .scene-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      padding: 3px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .scene-label span { color: var(--text-primary); font-weight: 500; }
+
+    .btn-disconnect {
+      padding: 5px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: color var(--transition), border-color var(--transition);
+    }
+
+    .btn-disconnect:hover { color: var(--color-red); border-color: var(--color-red); }
+
+    /* Page bar */
+    #page-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-subtle);
+      flex-wrap: wrap;
+    }
+
+    #page-bar.hidden { display: none; }
+
+    .page-tab {
+      padding: 4px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .page-tab:hover { border-color: var(--color-accent); color: var(--text-primary); }
+    .page-tab.active {
+      background: rgba(74,158,255,0.15);
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+      font-weight: 600;
+    }
+
+    /* Grid area */
+    #grid-area {
+      flex: 1;
+      overflow: auto;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    #grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    /* Cells */
+    .grid-cell {
+      width: 110px;
+      height: 110px;
+      position: relative;
+      border-radius: var(--radius-md);
+    }
+
+    .empty-cell {
+      width: 100%;
+      height: 100%;
+      border: 2px dashed var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: transparent;
+      opacity: 0.3;
+    }
+
+    /* Deck buttons */
+    .deck-button {
+      width: 100%;
+      height: 100%;
+      border-radius: var(--radius-md);
+      border: 2px solid var(--border-strong);
+      background: var(--bg-card);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: filter var(--transition), transform var(--transition);
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .deck-button:hover  { filter: brightness(1.15); }
+    .deck-button:active { transform: scale(0.94); filter: brightness(0.85); }
+
+    /* Background image */
+    .btn-img-layer {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      border-radius: calc(var(--radius-md) - 2px);
+    }
+
+    /* Icon */
+    .btn-icon {
+      position: absolute;
+      font-size: 30px;
+      z-index: 2;
+      pointer-events: none;
+      transition: var(--transition);
+    }
+
+    /* Text */
+    .btn-text {
+      position: absolute;
+      z-index: 3;
+      width: calc(100% - 8px);
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.3;
+      word-break: break-word;
+      pointer-events: none;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+      padding: 0 4px;
+    }
+
+    .btn-text.pos-top    { top: 5px; }
+    .btn-text.pos-center { top: 50%; transform: translateY(-50%); }
+    .btn-text.pos-bottom { bottom: 5px; }
+
+    .has-text-top    .btn-icon { bottom: 18px; }
+    .has-text-bottom .btn-icon { top: 12px; }
+    .has-text-center .btn-icon { top: 50%; transform: translateY(-50%); }
+
+    /* No-config / loading states */
+    #no-config {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 48px;
+      color: var(--text-secondary);
+      font-size: 14px;
+      text-align: center;
+    }
+
+    #no-config i { font-size: 36px; color: var(--text-dim); }
+  </style>
+</head>
+<body>
+
+<!-- ── Connect Screen ──────────────────────────────────────────────────────── -->
+<div id="connect-screen">
+  <div class="connect-card">
+    <div class="connect-logo">
+      <i class="fa-solid fa-table-cells-large"></i>
+      Deckgrid Remote
+    </div>
+    <p class="connect-subtitle">Connect to a running Deckgrid instance on your network.</p>
+
+    <div class="field">
+      <label for="ws-host">Host Address</label>
+      <input type="text" id="ws-host" placeholder="192.168.1.100" value="localhost">
+    </div>
+    <div class="field">
+      <label for="ws-port">Port</label>
+      <input type="number" id="ws-port" placeholder="8765" value="8765" min="1" max="65535">
+    </div>
+
+    <button class="btn-connect" id="btn-connect">
+      <i class="fa-solid fa-plug"></i> Connect
+    </button>
+
+    <div id="connect-error"></div>
+  </div>
+</div>
+
+<!-- ── Dashboard ──────────────────────────────────────────────────────────── -->
+<div id="dashboard" class="hidden">
+
+  <div id="topbar">
+    <div class="topbar-left">
+      <span class="app-logo">
+        <i class="fa-solid fa-table-cells-large"></i>
+        Deckgrid
+      </span>
+      <span class="remote-badge">REMOTE</span>
+    </div>
+
+    <div class="topbar-right">
+      <div class="conn-pill" id="obs-status">
+        <div class="conn-dot" id="obs-dot"></div>
+        <span id="obs-label">OBS disconnected</span>
+      </div>
+      <div class="scene-label" id="scene-label" style="display:none">
+        Scene: <span id="scene-name">—</span>
+      </div>
+      <button class="btn-disconnect" id="btn-disconnect">
+        <i class="fa-solid fa-plug-circle-xmark"></i> Disconnect
+      </button>
+    </div>
+  </div>
+
+  <div id="page-bar" class="hidden"></div>
+
+  <div id="grid-area">
+    <div id="no-config">
+      <i class="fa-solid fa-circle-notch fa-spin"></i>
+      Waiting for dashboard config…
+    </div>
+    <div id="grid" style="display:none"></div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────────────────────────────
+let ws = null;
+let config = null;
+let configPollTimer = null;
+let obsConnected = false;
+let currentScene = null;
+let studioModeEnabled = false;
+let currentPageIndex = 0;
+const sceneItemStates = new Map(); // "sceneName::sceneItemId" → boolean
+
+// ── DOM refs ───────────────────────────────────────────────────────────────────
+const connectScreen = document.getElementById('connect-screen');
+const dashboard     = document.getElementById('dashboard');
+const wsHostEl      = document.getElementById('ws-host');
+const wsPortEl      = document.getElementById('ws-port');
+const btnConnect    = document.getElementById('btn-connect');
+const connectError  = document.getElementById('connect-error');
+const obsDot        = document.getElementById('obs-dot');
+const obsLabelEl    = document.getElementById('obs-label');
+const sceneLabelEl  = document.getElementById('scene-label');
+const sceneNameEl   = document.getElementById('scene-name');
+const pageBar       = document.getElementById('page-bar');
+const grid          = document.getElementById('grid');
+const noConfig      = document.getElementById('no-config');
+
+// ── Connection ─────────────────────────────────────────────────────────────────
+function connect() {
+  const host = wsHostEl.value.trim() || 'localhost';
+  const port = parseInt(wsPortEl.value, 10) || 8765;
+  connectError.textContent = '';
+  btnConnect.disabled = true;
+  btnConnect.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Connecting…';
+
+  try {
+    ws = new WebSocket(`ws://${host}:${port}`);
+  } catch (e) {
+    setConnectError('Invalid address.');
+    return;
+  }
+
+  ws.addEventListener('open', () => {
+    connectScreen.classList.add('hidden');
+    dashboard.classList.remove('hidden');
+    btnConnect.disabled = false;
+    btnConnect.innerHTML = '<i class="fa-solid fa-plug"></i> Connect';
+    // Request current state and config
+    wsSend({ type: 'getState' });
+    wsSend({ type: 'getConfig' });
+    // Retry config every 2 s until received (handles race where wsConfig not yet set in main)
+    configPollTimer = setInterval(() => {
+      if (!config) wsSend({ type: 'getConfig' });
+      else stopConfigPoll();
+    }, 2000);
+  });
+
+  ws.addEventListener('message', (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    handleMessage(msg);
+  });
+
+  ws.addEventListener('close', () => {
+    onDisconnected('Connection closed.');
+  });
+
+  ws.addEventListener('error', () => {
+    onDisconnected('Could not connect. Is the remote server running?');
+  });
+}
+
+function onDisconnected(reason) {
+  ws = null;
+  stopConfigPoll();
+  // If dashboard is showing, go back to connect screen
+  dashboard.classList.add('hidden');
+  connectScreen.classList.remove('hidden');
+  btnConnect.disabled = false;
+  btnConnect.innerHTML = '<i class="fa-solid fa-plug"></i> Connect';
+  setConnectError(reason || '');
+  // Reset state
+  config = null;
+  obsConnected = false;
+  currentScene = null;
+  studioModeEnabled = false;
+  currentPageIndex = 0;
+  sceneItemStates.clear();
+}
+
+function setConnectError(msg) {
+  connectError.textContent = msg;
+}
+
+function wsSend(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(obj));
+  }
+}
+
+function stopConfigPoll() {
+  if (configPollTimer) { clearInterval(configPollTimer); configPollTimer = null; }
+}
+
+// ── Message handler ────────────────────────────────────────────────────────────
+function handleMessage(msg) {
+  switch (msg.type) {
+    case 'stateUpdate':
+      obsConnected       = !!msg.obsConnected;
+      currentScene       = msg.currentScene || null;
+      studioModeEnabled  = !!msg.studioModeEnabled;
+      updateObsStatus();
+      renderGrid();
+      break;
+
+    case 'configUpdate':
+      if (msg.config) {
+        stopConfigPoll();
+        config = msg.config;
+        currentPageIndex = 0;
+        renderPageBar();
+        renderGrid();
+      }
+      break;
+
+    case 'currentSceneChanged':
+      currentScene = msg.sceneName || null;
+      updateObsStatus();
+      refreshAllButtons();
+      break;
+
+    case 'sceneItemStateChanged':
+      if (msg.sceneName != null && msg.sceneItemId != null) {
+        const k = `${msg.sceneName}::${msg.sceneItemId}`;
+        sceneItemStates.set(k, !!msg.sceneItemEnabled);
+        refreshAffectedButtons(msg.sceneName, msg.sceneItemId);
+      }
+      break;
+
+    case 'studioModeChanged':
+      studioModeEnabled = !!msg.enabled;
+      refreshStudioModeButtons();
+      break;
+
+    case 'obsConnectionChanged':
+      obsConnected = !!msg.connected;
+      if (!obsConnected) { currentScene = null; }
+      updateObsStatus();
+      refreshAllButtons();
+      break;
+  }
+}
+
+// ── OBS status display ─────────────────────────────────────────────────────────
+function updateObsStatus() {
+  if (obsConnected) {
+    obsDot.className = 'conn-dot connected';
+    obsLabelEl.textContent = 'OBS connected';
+    sceneLabelEl.style.display = 'flex';
+    sceneNameEl.textContent = currentScene || '—';
+  } else {
+    obsDot.className = 'conn-dot disconnected';
+    obsLabelEl.textContent = 'OBS disconnected';
+    sceneLabelEl.style.display = 'none';
+  }
+}
+
+// ── Page bar ───────────────────────────────────────────────────────────────────
+function renderPageBar() {
+  if (!config || !config.pages || config.pages.length <= 1) {
+    pageBar.classList.add('hidden');
+    return;
+  }
+  pageBar.classList.remove('hidden');
+  pageBar.innerHTML = '';
+  config.pages.forEach((page, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'page-tab' + (idx === currentPageIndex ? ' active' : '');
+    btn.textContent = page.name || `Page ${idx + 1}`;
+    btn.addEventListener('click', () => goToPage(idx));
+    pageBar.appendChild(btn);
+  });
+}
+
+function goToPage(idx) {
+  if (!config || idx < 0 || idx >= config.pages.length) return;
+  currentPageIndex = idx;
+  renderPageBar();
+  renderGrid();
+}
+
+// ── Grid rendering ─────────────────────────────────────────────────────────────
+function currentButtons() {
+  if (!config || !config.pages) return {};
+  const idx = Math.min(Math.max(0, currentPageIndex), config.pages.length - 1);
+  return config.pages[idx].buttons || {};
+}
+
+function renderGrid() {
+  if (!config) {
+    noConfig.style.display = 'flex';
+    grid.style.display = 'none';
+    return;
+  }
+
+  noConfig.style.display = 'none';
+  grid.style.display = 'grid';
+
+  const rows = config.rows || 3;
+  const cols = config.columns || 4;
+  const zoom = (config.zoom || 100) / 100;
+  grid.style.gridTemplateColumns = `repeat(${cols}, 110px)`;
+  grid.style.gridTemplateRows    = `repeat(${rows}, 110px)`;
+  grid.style.transform = `scale(${zoom})`;
+  grid.style.transformOrigin = 'top center';
+
+  grid.innerHTML = '';
+  const buttons = currentButtons();
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const key = `${r}_${c}`;
+      const cell = document.createElement('div');
+      cell.className = 'grid-cell';
+
+      const btn = buttons[key];
+      if (btn) {
+        cell.appendChild(buildDeckButton(key, btn));
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'empty-cell';
+        cell.appendChild(empty);
+      }
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function buildDeckButton(key, btnConfig) {
+  const isActive = isButtonActive(btnConfig);
+  const style = isActive ? btnConfig.active : btnConfig.inactive;
+
+  const DEFAULT_BG     = '#1e2a4a';
+  const DEFAULT_BORDER = '#3a4a6a';
+  const DEFAULT_TEXT   = '#ffffff';
+
+  const el = document.createElement('div');
+  el.className = 'deck-button';
+  el.dataset.key = key;
+  el.setAttribute('role', 'button');
+  el.setAttribute('tabindex', '0');
+  el.style.backgroundColor = style.backgroundColor || DEFAULT_BG;
+  el.style.borderColor     = style.borderColor     || DEFAULT_BORDER;
+  el.style.borderWidth     = '2px';
+  el.style.borderStyle     = 'solid';
+
+  // Background image
+  if (style.image) {
+    const imgLayer = document.createElement('div');
+    imgLayer.className = 'btn-img-layer';
+    imgLayer.style.backgroundImage = `url(${style.image})`;
+    el.appendChild(imgLayer);
+  }
+
+  const hasText = !!(style.text && style.text.trim());
+  const textPos = style.textPosition || 'center';
+
+  // Icon
+  if (style.icon) {
+    const icon = document.createElement('i');
+    icon.className = `fa-solid fa-${style.icon} btn-icon`;
+    icon.style.color = style.textColor || DEFAULT_TEXT;
+    if (hasText) {
+      el.classList.add(`has-text-${textPos}`);
+    } else {
+      icon.style.top = '50%';
+      icon.style.transform = 'translateY(-50%)';
+    }
+    el.appendChild(icon);
+  }
+
+  // Text
+  if (hasText) {
+    const span = document.createElement('span');
+    span.className = `btn-text pos-${textPos}`;
+    span.style.color = style.textColor || DEFAULT_TEXT;
+    span.textContent = style.text;
+    el.appendChild(span);
+  }
+
+  // Click handler
+  el.addEventListener('click', () => {
+    // Handle navigatePage locally
+    if (btnConfig.action === 'navigatePage' && btnConfig.actionData != null) {
+      goToPage(btnConfig.actionData.pageIndex);
+    } else {
+      wsSend({ type: 'pressButton', key });
+    }
+  });
+
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') el.click();
+  });
+
+  return el;
+}
+
+// ── Active state ───────────────────────────────────────────────────────────────
+function isButtonActive(btnConfig) {
+  if (btnConfig.action === 'navigatePage') {
+    return btnConfig.actionData != null &&
+           btnConfig.actionData.pageIndex === currentPageIndex;
+  }
+  if (!obsConnected) return false;
+
+  switch (btnConfig.action) {
+    case 'scene':
+      return btnConfig.actionData &&
+             btnConfig.actionData.sceneName === currentScene;
+
+    case 'toggleSource': {
+      const d = btnConfig.actionData;
+      if (!d || !d.sceneName || d.sceneItemId == null) return false;
+      return sceneItemStates.get(`${d.sceneName}::${d.sceneItemId}`) === true;
+    }
+
+    case 'studioModeTransition':
+      return studioModeEnabled;
+
+    default:
+      return false;
+  }
+}
+
+// ── Targeted refresh helpers ───────────────────────────────────────────────────
+function refreshAllButtons() {
+  if (!config) return;
+  const buttons = currentButtons();
+  const cells = grid.querySelectorAll('.grid-cell');
+  cells.forEach((cell) => {
+    const key = cell.firstChild && cell.firstChild.dataset && cell.firstChild.dataset.key;
+    if (!key) return;
+    const btn = buttons[key];
+    if (!btn) return;
+    const rebuilt = buildDeckButton(key, btn);
+    cell.innerHTML = '';
+    cell.appendChild(rebuilt);
+  });
+}
+
+function refreshAffectedButtons(sceneName, sceneItemId) {
+  if (!config) return;
+  const buttons = currentButtons();
+  const cells = grid.querySelectorAll('.grid-cell');
+  cells.forEach((cell) => {
+    const child = cell.firstChild;
+    if (!child || !child.dataset || !child.dataset.key) return;
+    const key = child.dataset.key;
+    const btn = buttons[key];
+    if (!btn || btn.action !== 'toggleSource') return;
+    const d = btn.actionData;
+    if (d && d.sceneName === sceneName && d.sceneItemId === sceneItemId) {
+      const rebuilt = buildDeckButton(key, btn);
+      cell.innerHTML = '';
+      cell.appendChild(rebuilt);
+    }
+  });
+}
+
+function refreshStudioModeButtons() {
+  if (!config) return;
+  const buttons = currentButtons();
+  const cells = grid.querySelectorAll('.grid-cell');
+  cells.forEach((cell) => {
+    const child = cell.firstChild;
+    if (!child || !child.dataset || !child.dataset.key) return;
+    const key = child.dataset.key;
+    const btn = buttons[key];
+    if (!btn || btn.action !== 'studioModeTransition') return;
+    const rebuilt = buildDeckButton(key, btn);
+    cell.innerHTML = '';
+    cell.appendChild(rebuilt);
+  });
+}
+
+// ── Event bindings ─────────────────────────────────────────────────────────────
+btnConnect.addEventListener('click', connect);
+
+[wsHostEl, wsPortEl].forEach((el) => {
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(); });
+});
+
+document.getElementById('btn-disconnect').addEventListener('click', () => {
+  if (ws) { ws.close(); ws = null; }
+  onDisconnected('');
+});
+</script>
+</body>
+</html>
