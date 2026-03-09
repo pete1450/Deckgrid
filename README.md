@@ -6,20 +6,21 @@ I didn't like any of the other options that either cost too much or had annoying
 
 ## Features
 
-- **Customizable button grid** — configure any number of rows (up to 8) and columns (up to 12) to fit your workflow.
-- **Edit and Operations modes** — switch between editing the layout and using the deck for live control.
-- **OBS integration** — connects to OBS Studio over WebSocket (obs-websocket v5) to perform actions in real time:
+- **Customizable button grid** - configure any number of rows (up to 8) and columns (up to 12) to fit your workflow.
+- **Multi-page** - Switch between multiple grids with button actions to take you there instantly.
+- **Edit and Operations modes** - switch between editing the layout and using the deck for live control.
+- **OBS integration** - connects to OBS Studio over WebSocket (obs-websocket v5) to perform actions in real time:
   - Switch the current program scene.
   - Toggle the visibility of individual scene sources.
   - Trigger a Studio Mode transition.
-- **Per-button appearance** — each button has independently configurable inactive and active states, including:
+- **Per-button appearance** - each button has independently configurable inactive and active states, including:
   - Label text and text position (top, center, or bottom).
   - Background color, border color, and text color.
   - A Font Awesome icon (e.g. `video`, `microphone`).
   - A custom image (JPG, PNG, GIF, WebP, or SVG).
-- **Drag-and-drop reordering** — rearrange buttons by dragging them in Edit mode.
-- **Zoom control** — scale the grid from 40% to 300% using a slider.
-- **Persistent configuration** — your grid layout and all button settings are saved automatically in the browser's local storage and restored on next launch.
+- **Drag-and-drop reordering** - rearrange buttons by dragging them in Edit mode.
+- **Zoom control** - scale the grid from 40% to 300% using a slider.
+- **Persistent configuration** - your grid layout and all button settings are saved automatically and restored on next launch.
 
 ## Screenshots
 ![Operations view](deckgridop.jpg)
