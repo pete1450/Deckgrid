@@ -36,13 +36,13 @@
     }
   },
   "dependencies": {
-    "@fortawesome/fontawesome-free": "^6.7.2",
-    "electron-store": "^8.2.0",
+    "@fortawesome/fontawesome-free": "^7.2.0",
+    "electron-store": "^11.0.2",
     "obs-websocket-js": "^5.0.7",
     "ws": "^8.19.0"
   },
   "devDependencies": {
-    "electron": "^36.9.5",
+    "electron": "^40.8.0",
     "electron-builder": "^26.8.1"
   }
 }

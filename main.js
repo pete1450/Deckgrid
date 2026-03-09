@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { OBSWebSocket } = require('obs-websocket-js');
-const Store = require('electron-store');
+const Store = require('electron-store').default;
 
 const store = new Store();
 const { WebSocketServer, WebSocket } = require('ws');
