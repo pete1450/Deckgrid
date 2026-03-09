@@ -23,8 +23,13 @@ I didn't like any of the other options that either cost too much or had annoying
 - **Persistent configuration** - your grid layout and all button settings are saved automatically and restored on next launch.
 
 ## Screenshots
+### Operating view
 ![Operations view](deckgridop.jpg)
+
+### Editing view
 ![Edit view](deckgridedit.jpg)
+
+### Remote view
 ![Remote view](deckgridremote.jpg)
 
 ## Requirements
