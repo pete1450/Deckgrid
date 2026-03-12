@@ -321,6 +321,34 @@ class DeckGrid {
     this._renderPageBar();
   }
 
+  _confirm(message) {
+    return new Promise((resolve) => {
+      const modal   = document.getElementById('confirm-modal');
+      const msgEl   = document.getElementById('confirm-message');
+      const okBtn   = document.getElementById('confirm-ok');
+      const cancelBtn = document.getElementById('confirm-cancel');
+
+      msgEl.textContent = message;
+      modal.classList.remove('hidden');
+
+      const cleanup = (result) => {
+        modal.classList.add('hidden');
+        okBtn.removeEventListener('click', onOk);
+        cancelBtn.removeEventListener('click', onCancel);
+        modal.removeEventListener('click', onBackdrop);
+        resolve(result);
+      };
+
+      const onOk      = () => cleanup(true);
+      const onCancel  = () => cleanup(false);
+      const onBackdrop = (e) => { if (e.target === modal) cleanup(false); };
+
+      okBtn.addEventListener('click', onOk);
+      cancelBtn.addEventListener('click', onCancel);
+      modal.addEventListener('click', onBackdrop);
+    });
+  }
+
   _removePage(index) {
     if (this.config.pages.length <= 1) return; // Cannot remove the last page
     this.config.pages.splice(index, 1);
@@ -362,9 +390,10 @@ class DeckGrid {
           del.className = 'page-tab-delete';
           del.title = 'Delete page';
           del.innerHTML = '&times;';
-          del.addEventListener('click', (e) => {
+          del.addEventListener('click', async (e) => {
             e.stopPropagation();
-            this._removePage(idx);
+            const confirmed = await this._confirm(`Delete page "${page.name}"? This cannot be undone.`);
+            if (confirmed) this._removePage(idx);
           });
           tab.appendChild(del);
         }
