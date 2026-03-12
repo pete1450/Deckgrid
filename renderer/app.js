@@ -191,7 +191,7 @@ class DeckGrid {
       }
     }
     // Clamp active index
-    if (cfg.activeProfileIndex == null || cfg.activeProfileIndex >= cfg.profiles.length) {
+    if (cfg.activeProfileIndex === null || cfg.activeProfileIndex === undefined || cfg.activeProfileIndex >= cfg.profiles.length) {
       cfg.activeProfileIndex = 0;
     }
     return cfg;
@@ -469,7 +469,10 @@ class DeckGrid {
     const existingNames = new Set(this.config.profiles.map((p) => p.name));
     let num = this.config.profiles.length + 1;
     let name = `Profile ${num}`;
-    while (existingNames.has(name)) { num++; name = `Profile ${num}`; }
+    while (existingNames.has(name)) {
+      num++;
+      name = `Profile ${num}`;
+    }
     const def = this._defaultConfig().profiles[0];
     this.config.profiles.push({
       name, rows: def.rows, columns: def.columns, zoom: def.zoom,
@@ -821,7 +824,7 @@ class DeckGrid {
 
     // Non-OBS actions — work regardless of connection state
     if (btnConfig.action === 'navigatePage') {
-      if (d.pageIndex != null && d.pageIndex >= 0 && d.pageIndex < this._activeProfile().pages.length) {
+      if (d.pageIndex !== null && d.pageIndex !== undefined && d.pageIndex >= 0 && d.pageIndex < this._activeProfile().pages.length) {
         this._goToPage(d.pageIndex);
       }
       return;
