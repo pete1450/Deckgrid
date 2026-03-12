@@ -105,6 +105,7 @@ class DeckGrid {
     this.config = await this._loadConfig();
     this._pushConfigToMain();
     this._bindTopBar();
+    this._bindProfileControls();
     this._bindObsModal();
     this._bindRemoteModal();
     this._bindEditorModal();
@@ -113,6 +114,7 @@ class DeckGrid {
     this._applyGridLayout();
     this._applyZoom();
     this._renderPageBar();
+    this._renderProfileSelector();
     this._subscribeOBSEvents();
     this._autoConnectOBS();
     this._autoStartRemote();
@@ -139,26 +141,60 @@ class DeckGrid {
   async _loadConfig() {
     try {
       const res = await window.electronAPI.storeGet('config');
-      if (res.success && res.data) return res.data;
+      if (res.success && res.data) {
+        const cfg = res.data;
+        return this._migrateToProfiles(cfg, /* save */ true);
+      }
       // Migrate from localStorage if present
       const raw = localStorage.getItem('deckgrid-config');
       if (raw) {
         const parsed = JSON.parse(raw);
-        await window.electronAPI.storeSet('config', parsed);
+        const migrated = this._migrateToProfiles(parsed, /* save */ false);
+        await window.electronAPI.storeSet('config', migrated);
         localStorage.removeItem('deckgrid-config');
-        // Migrate old format: flat buttons → pages[0]
-        if (parsed.buttons && !parsed.pages) {
-          parsed.pages = [{ name: 'Page 1', buttons: parsed.buttons }];
-          delete parsed.buttons;
-        }
-        // Ensure pages array exists with at least one entry
-        if (!Array.isArray(parsed.pages) || parsed.pages.length === 0) {
-          parsed.pages = [{ name: 'Page 1', buttons: {} }];
-        }
-        return parsed;
+        return migrated;
       }
     } catch (_) {}
     return this._defaultConfig();
+  }
+
+  /**
+   * Ensure a config object uses the profiles structure.
+   * Mutates and returns the object.  If `save` is true, persists the migrated
+   * config via IPC (fire-and-forget) so the store stays up to date.
+   */
+  _migrateToProfiles(cfg, save = false) {
+    if (!Array.isArray(cfg.profiles) || cfg.profiles.length === 0) {
+      // Old format: rows/columns/zoom/pages were top-level fields
+      let pages = cfg.pages;
+      if (!Array.isArray(pages) || pages.length === 0) {
+        pages = cfg.buttons
+          ? [{ name: 'Page 1', buttons: cfg.buttons }]
+          : [{ name: 'Page 1', buttons: {} }];
+      }
+      const profile = {
+        name:    'Default',
+        rows:    cfg.rows    ?? 3,
+        columns: cfg.columns ?? 4,
+        zoom:    cfg.zoom    ?? 100,
+        pages,
+      };
+      cfg.profiles = [profile];
+      cfg.activeProfileIndex = 0;
+      delete cfg.rows;
+      delete cfg.columns;
+      delete cfg.zoom;
+      delete cfg.pages;
+      delete cfg.buttons;
+      if (save && window.electronAPI) {
+        window.electronAPI.storeSet('config', cfg).catch(() => {});
+      }
+    }
+    // Clamp active index
+    if (cfg.activeProfileIndex == null || cfg.activeProfileIndex >= cfg.profiles.length) {
+      cfg.activeProfileIndex = 0;
+    }
+    return cfg;
   }
 
   async _saveConfig() {
@@ -179,19 +215,28 @@ class DeckGrid {
 
   _defaultConfig() {
     return {
-      rows: 3, columns: 4, zoom: 100,
       obs: { host: 'localhost', port: 4455, password: '' },
       remote: { enabled: false, port: 8765 },
-      pages: [{ name: 'Page 1', buttons: {} }],
+      activeProfileIndex: 0,
+      profiles: [
+        { name: 'Default', rows: 3, columns: 4, zoom: 100, pages: [{ name: 'Page 1', buttons: {} }] },
+      ],
     };
+  }
+
+  // ─── Active profile accessor ────────────────────────────────────────────────
+  _activeProfile() {
+    const profiles = this.config.profiles;
+    const idx = Math.max(0, Math.min(this.config.activeProfileIndex ?? 0, profiles.length - 1));
+    return profiles[idx];
   }
 
   // ─── Page helpers ──────────────────────────────────────────────────────────
   _currentPage() {
-    const pages = this.config.pages;
+    const pages = this._activeProfile().pages;
     if (!pages || pages.length === 0) {
-      this.config.pages = [{ name: 'Page 1', buttons: {} }];
-      return this.config.pages[0];
+      this._activeProfile().pages = [{ name: 'Page 1', buttons: {} }];
+      return this._activeProfile().pages[0];
     }
     const idx = Math.min(Math.max(0, this.currentPageIndex), pages.length - 1);
     return pages[idx];
@@ -214,30 +259,30 @@ class DeckGrid {
     const rowsInput = document.getElementById('grid-rows');
     const zoomInput = document.getElementById('grid-zoom');
 
-    colsInput.value = this.config.columns;
-    rowsInput.value = this.config.rows;
-    zoomInput.value = this.config.zoom;
-    document.getElementById('zoom-value').textContent = `${this.config.zoom}%`;
+    colsInput.value = this._activeProfile().columns;
+    rowsInput.value = this._activeProfile().rows;
+    zoomInput.value = this._activeProfile().zoom;
+    document.getElementById('zoom-value').textContent = `${this._activeProfile().zoom}%`;
 
     colsInput.addEventListener('change', () => {
-      this.config.columns = Math.max(1, Math.min(12, parseInt(colsInput.value) || 1));
-      colsInput.value = this.config.columns;
+      this._activeProfile().columns = Math.max(1, Math.min(12, parseInt(colsInput.value) || 1));
+      colsInput.value = this._activeProfile().columns;
       this._saveConfig();
       this._renderGrid();
       this._applyGridLayout();
     });
 
     rowsInput.addEventListener('change', () => {
-      this.config.rows = Math.max(1, Math.min(8, parseInt(rowsInput.value) || 1));
-      rowsInput.value = this.config.rows;
+      this._activeProfile().rows = Math.max(1, Math.min(8, parseInt(rowsInput.value) || 1));
+      rowsInput.value = this._activeProfile().rows;
       this._saveConfig();
       this._renderGrid();
       this._applyGridLayout();
     });
 
     zoomInput.addEventListener('input', () => {
-      this.config.zoom = parseInt(zoomInput.value);
-      document.getElementById('zoom-value').textContent = `${this.config.zoom}%`;
+      this._activeProfile().zoom = parseInt(zoomInput.value);
+      document.getElementById('zoom-value').textContent = `${this._activeProfile().zoom}%`;
       this._applyZoom();
       this._saveConfig();
     });
@@ -280,23 +325,24 @@ class DeckGrid {
       controls.classList.add('hidden');
     }
     this._renderPageBar();
+    this._renderProfileSelector();
   }
 
   _applyGridLayout() {
     const grid = document.getElementById('grid');
-    grid.style.gridTemplateColumns = `repeat(${this.config.columns}, 110px)`;
-    grid.style.gridTemplateRows    = `repeat(${this.config.rows}, 110px)`;
+    grid.style.gridTemplateColumns = `repeat(${this._activeProfile().columns}, 110px)`;
+    grid.style.gridTemplateRows    = `repeat(${this._activeProfile().rows}, 110px)`;
   }
 
   _applyZoom() {
     const scaler = document.getElementById('grid-scaler');
-    const z = (this.config.zoom || 100) / 100;
+    const z = (this._activeProfile().zoom || 100) / 100;
     scaler.style.transform = `scale(${z})`;
   }
 
   // ─── Page management ───────────────────────────────────────────────────────
   _goToPage(index) {
-    const clamped = Math.max(0, Math.min(index, this.config.pages.length - 1));
+    const clamped = Math.max(0, Math.min(index, this._activeProfile().pages.length - 1));
     if (clamped === this.currentPageIndex) return;
     this.currentPageIndex = clamped;
     this._renderGrid();
@@ -306,26 +352,28 @@ class DeckGrid {
 
   _addPage() {
     // Generate a unique page name
-    const existingNames = new Set(this.config.pages.map((p) => p.name));
-    let num = this.config.pages.length + 1;
+    const pages = this._activeProfile().pages;
+    const existingNames = new Set(pages.map((p) => p.name));
+    let num = pages.length + 1;
     let name = `Page ${num}`;
     while (existingNames.has(name)) {
       num++;
       name = `Page ${num}`;
     }
-    this.config.pages.push({ name, buttons: {} });
+    pages.push({ name, buttons: {} });
     this._saveConfig();
-    this.currentPageIndex = this.config.pages.length - 1;
+    this.currentPageIndex = pages.length - 1;
     this._renderGrid();
     this._applyGridLayout();
     this._renderPageBar();
   }
 
   _removePage(index) {
-    if (this.config.pages.length <= 1) return; // Cannot remove the last page
-    this.config.pages.splice(index, 1);
-    if (this.currentPageIndex >= this.config.pages.length) {
-      this.currentPageIndex = this.config.pages.length - 1;
+    const pages = this._activeProfile().pages;
+    if (pages.length <= 1) return; // Cannot remove the last page
+    pages.splice(index, 1);
+    if (this.currentPageIndex >= pages.length) {
+      this.currentPageIndex = pages.length - 1;
     }
     this._saveConfig();
     this._renderGrid();
@@ -336,9 +384,10 @@ class DeckGrid {
   _renderPageBar() {
     const bar = document.getElementById('page-bar');
     bar.innerHTML = '';
+    const pages = this._activeProfile().pages;
 
     // In ops mode with only one page, hide the bar
-    if (!this.editMode && this.config.pages.length <= 1) {
+    if (!this.editMode && pages.length <= 1) {
       bar.classList.add('hidden');
       return;
     }
@@ -349,7 +398,7 @@ class DeckGrid {
       const tabsContainer = document.createElement('div');
       tabsContainer.className = 'page-tabs';
 
-      this.config.pages.forEach((page, idx) => {
+      pages.forEach((page, idx) => {
         const tab = document.createElement('button');
         tab.className = 'page-tab' + (idx === this.currentPageIndex ? ' active-page' : '');
 
@@ -357,7 +406,7 @@ class DeckGrid {
         nameSpan.textContent = page.name;
         tab.appendChild(nameSpan);
 
-        if (this.config.pages.length > 1) {
+        if (pages.length > 1) {
           const del = document.createElement('span');
           del.className = 'page-tab-delete';
           del.title = 'Delete page';
@@ -401,7 +450,7 @@ class DeckGrid {
 
       const indicator = document.createElement('span');
       indicator.className = 'page-indicator';
-      const pageName = this.config.pages[this.currentPageIndex]?.name || `Page ${this.currentPageIndex + 1}`;
+      const pageName = pages[this.currentPageIndex]?.name || `Page ${this.currentPageIndex + 1}`;
       indicator.textContent = pageName;
       bar.appendChild(indicator);
 
@@ -409,9 +458,138 @@ class DeckGrid {
       nextBtn.className = 'page-nav-btn';
       nextBtn.title = 'Next page';
       nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
-      nextBtn.disabled = this.currentPageIndex === this.config.pages.length - 1;
+      nextBtn.disabled = this.currentPageIndex === pages.length - 1;
       nextBtn.addEventListener('click', () => this._goToPage(this.currentPageIndex + 1));
       bar.appendChild(nextBtn);
+    }
+  }
+
+  // ─── Profile management ────────────────────────────────────────────────────
+  _addProfile() {
+    const existingNames = new Set(this.config.profiles.map((p) => p.name));
+    let num = this.config.profiles.length + 1;
+    let name = `Profile ${num}`;
+    while (existingNames.has(name)) { num++; name = `Profile ${num}`; }
+    const def = this._defaultConfig().profiles[0];
+    this.config.profiles.push({
+      name, rows: def.rows, columns: def.columns, zoom: def.zoom,
+      pages: [{ name: 'Page 1', buttons: {} }],
+    });
+    this.config.activeProfileIndex = this.config.profiles.length - 1;
+    this.currentPageIndex = 0;
+    this._saveConfig();
+    this._renderProfileSelector();
+    this._renderGrid();
+    this._applyGridLayout();
+    this._applyZoom();
+    this._renderPageBar();
+    this._syncGridControls();
+  }
+
+  _removeProfile(index) {
+    if (this.config.profiles.length <= 1) return; // Cannot remove the last profile
+    this.config.profiles.splice(index, 1);
+    if (this.config.activeProfileIndex >= this.config.profiles.length) {
+      this.config.activeProfileIndex = this.config.profiles.length - 1;
+    }
+    this.currentPageIndex = 0;
+    this._saveConfig();
+    this._renderProfileSelector();
+    this._renderGrid();
+    this._applyGridLayout();
+    this._applyZoom();
+    this._renderPageBar();
+    this._syncGridControls();
+  }
+
+  _switchProfile(index) {
+    const clamped = Math.max(0, Math.min(index, this.config.profiles.length - 1));
+    if (clamped === this.config.activeProfileIndex) return;
+    this.config.activeProfileIndex = clamped;
+    this.currentPageIndex = 0;
+    this._saveConfig();
+    this._renderGrid();
+    this._applyGridLayout();
+    this._applyZoom();
+    this._renderPageBar();
+    this._renderProfileSelector();
+    this._syncGridControls();
+  }
+
+  _renameProfile(index, newName) {
+    const trimmed = (newName || '').trim();
+    if (!trimmed) return;
+    this.config.profiles[index].name = trimmed;
+    this._saveConfig();
+    this._renderProfileSelector();
+  }
+
+  /** Sync grid-controls inputs to reflect the active profile's values. */
+  _syncGridControls() {
+    const prof = this._activeProfile();
+    document.getElementById('grid-cols').value = prof.columns;
+    document.getElementById('grid-rows').value = prof.rows;
+    document.getElementById('grid-zoom').value = prof.zoom;
+    document.getElementById('zoom-value').textContent = `${prof.zoom}%`;
+  }
+
+  /** Rebuild the profile <select> and update edit-mode button states. */
+  _renderProfileSelector() {
+    const select  = document.getElementById('profile-select');
+    const addBtn  = document.getElementById('profile-add-btn');
+    const renameBtn = document.getElementById('profile-rename-btn');
+    const delBtn  = document.getElementById('profile-delete-btn');
+    if (!select) return;
+
+    select.innerHTML = '';
+    this.config.profiles.forEach((p, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = p.name;
+      if (i === this.config.activeProfileIndex) opt.selected = true;
+      select.appendChild(opt);
+    });
+
+    const isEdit = this.editMode;
+    if (addBtn)    addBtn.classList.toggle('hidden', !isEdit);
+    if (renameBtn) renameBtn.classList.toggle('hidden', !isEdit);
+    if (delBtn) {
+      delBtn.classList.toggle('hidden', !isEdit);
+      delBtn.disabled = this.config.profiles.length <= 1;
+    }
+  }
+
+  _bindProfileControls() {
+    const select    = document.getElementById('profile-select');
+    const addBtn    = document.getElementById('profile-add-btn');
+    const renameBtn = document.getElementById('profile-rename-btn');
+    const delBtn    = document.getElementById('profile-delete-btn');
+    if (!select) return;
+
+    select.addEventListener('change', () => {
+      this._switchProfile(parseInt(select.value, 10));
+    });
+
+    if (addBtn) {
+      addBtn.addEventListener('click', () => this._addProfile());
+    }
+
+    if (renameBtn) {
+      renameBtn.addEventListener('click', () => {
+        const current = this._activeProfile();
+        const newName = window.prompt('Profile name:', current.name);
+        if (newName !== null) this._renameProfile(this.config.activeProfileIndex, newName);
+      });
+    }
+
+    if (delBtn) {
+      delBtn.addEventListener('click', () => {
+        if (this.config.profiles.length <= 1) return;
+        const current = this._activeProfile();
+        if (window.confirm(`Delete profile "${current.name}"? This cannot be undone.`)) {
+          this._removeProfile(this.config.activeProfileIndex);
+        }
+      });
     }
   }
 
@@ -420,8 +598,9 @@ class DeckGrid {
     const grid = document.getElementById('grid');
     grid.innerHTML = '';
 
-    for (let r = 0; r < this.config.rows; r++) {
-      for (let c = 0; c < this.config.columns; c++) {
+    const prof = this._activeProfile();
+    for (let r = 0; r < prof.rows; r++) {
+      for (let c = 0; c < prof.columns; c++) {
         const key = `${r}_${c}`;
         const cell = document.createElement('div');
         cell.className = 'grid-cell';
@@ -642,7 +821,7 @@ class DeckGrid {
 
     // Non-OBS actions — work regardless of connection state
     if (btnConfig.action === 'navigatePage') {
-      if (d.pageIndex != null && d.pageIndex >= 0 && d.pageIndex < this.config.pages.length) {
+      if (d.pageIndex != null && d.pageIndex >= 0 && d.pageIndex < this._activeProfile().pages.length) {
         this._goToPage(d.pageIndex);
       }
       return;
@@ -779,7 +958,7 @@ class DeckGrid {
       if (MODIFIER_KEYS.includes(e.key)) return;
 
       const combo = _buildHotkeyString(e);
-      for (const page of (this.config.pages || [])) {
+      for (const page of (this._activeProfile().pages || [])) {
         for (const [key, btn] of Object.entries(page.buttons || {})) {
           if (btn.hotkey && btn.hotkey === combo) {
             e.preventDefault();
@@ -835,7 +1014,7 @@ class DeckGrid {
 
   async _refreshToggleSourceStates() {
     const seen = new Set();
-    for (const page of this.config.pages) {
+    for (const page of this._activeProfile().pages) {
       for (const btn of Object.values(page.buttons)) {
         if (btn.action === 'toggleSource' && btn.actionData) {
           const { sceneName, sceneItemId } = btn.actionData;
@@ -1360,7 +1539,7 @@ class DeckGrid {
   _populatePagePicker() {
     const select = document.getElementById('action-target-page');
     select.innerHTML = '';
-    this.config.pages.forEach((page, idx) => {
+    this._activeProfile().pages.forEach((page, idx) => {
       const opt = document.createElement('option');
       opt.value = idx;
       opt.textContent = page.name;
@@ -1501,22 +1680,43 @@ class DeckGrid {
           throw new Error('Invalid config file');
         }
 
-        let pages;
-        if (Array.isArray(parsed.pages) && parsed.pages.length > 0) {
-          pages = parsed.pages;
+        let profiles;
+        let activeProfileIndex = 0;
+
+        if (Array.isArray(parsed.profiles) && parsed.profiles.length > 0) {
+          // New multi-profile format — overwrites all profiles
+          profiles = parsed.profiles;
+          activeProfileIndex = parsed.activeProfileIndex ?? 0;
+          if (activeProfileIndex >= profiles.length) activeProfileIndex = 0;
+        } else if (Array.isArray(parsed.pages) && parsed.pages.length > 0) {
+          // Old multi-page, single-profile format
+          const def = this._defaultConfig().profiles[0];
+          profiles = [{
+            name:    'Default',
+            rows:    parsed.rows    ?? def.rows,
+            columns: parsed.columns ?? def.columns,
+            zoom:    parsed.zoom    ?? def.zoom,
+            pages:   parsed.pages,
+          }];
         } else if (typeof parsed.buttons === 'object' && parsed.buttons !== null) {
-          // Migrate old single-page format
-          pages = [{ name: 'Page 1', buttons: parsed.buttons }];
+          // Very old single-page format
+          const def = this._defaultConfig().profiles[0];
+          profiles = [{
+            name:    'Default',
+            rows:    parsed.rows    ?? def.rows,
+            columns: parsed.columns ?? def.columns,
+            zoom:    parsed.zoom    ?? def.zoom,
+            pages:   [{ name: 'Page 1', buttons: parsed.buttons }],
+          }];
         } else {
-          throw new Error('Config file must contain a "pages" array or a "buttons" object');
+          throw new Error('Config file must contain a "profiles" array, "pages" array, or "buttons" object');
         }
 
         this.config = {
-          rows:    parsed.rows    ?? this._defaultConfig().rows,
-          columns: parsed.columns ?? this._defaultConfig().columns,
-          zoom:    parsed.zoom    ?? this._defaultConfig().zoom,
-          obs:     parsed.obs     ?? this.config.obs,
-          pages,
+          obs:                parsed.obs ?? this.config.obs,
+          remote:             this.config.remote,
+          activeProfileIndex,
+          profiles,
         };
         this.currentPageIndex = 0;
         this._saveConfig();
@@ -1524,10 +1724,8 @@ class DeckGrid {
         this._applyGridLayout();
         this._applyZoom();
         this._renderPageBar();
-        document.getElementById('grid-cols').value = this.config.columns;
-        document.getElementById('grid-rows').value = this.config.rows;
-        document.getElementById('grid-zoom').value = this.config.zoom;
-        document.getElementById('zoom-value').textContent = `${this.config.zoom}%`;
+        this._renderProfileSelector();
+        this._syncGridControls();
         this._showToast('Config imported', 'success');
       } catch (err) {
         this._showToast(`Import failed: ${err.message}`, 'error');

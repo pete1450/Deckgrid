@@ -400,6 +400,33 @@ button {
 
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 
+/* ── Profile controls ────────────────────────────────────────────────────── */
+.profile-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.profile-select {
+  padding: 5px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  max-width: 160px;
+  outline: none;
+}
+
+.profile-select:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
+}
+
+
 /* ── Modals ──────────────────────────────────────────────────────────────── */
 .modal-backdrop {
   position: fixed;
