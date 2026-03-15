@@ -8,6 +8,7 @@ I didn't like any of the other options that either cost too much or had annoying
 
 - **Customizable button grid** - configure any number of rows (up to 8) and columns (up to 12) to fit your workflow.
 - **Multi-page** - Switch between multiple grids with button actions to take you there instantly.
+- **Profiles** - maintain completely separate grid layouts, page sets, and button configurations (e.g. one profile per game or scene setup), and switch between them instantly from the top bar.
 - **Edit and Operations modes** - switch between editing the layout and using the deck for live control.
 - **OBS integration** - connects to OBS Studio over WebSocket (obs-websocket v5) to perform actions in real time:
   - Switch the current program scene.
@@ -75,6 +76,19 @@ The status indicator in the top bar turns green when the connection is establish
 3. Connect
 
 ## Usage
+
+### Profiles
+
+Profiles let you keep completely independent grid setups — each profile has its own grid dimensions, zoom level, pages, and buttons.
+
+| Action | How |
+|---|---|
+| Switch profile | Select it from the dropdown in the top bar. |
+| Add a profile | Enter **Edit mode**, then click the **+** button next to the profile dropdown. |
+| Rename a profile | Enter **Edit mode**, then click the **pen** icon. |
+| Delete a profile | Enter **Edit mode**, then click the **trash** icon. |
+
+The last remaining profile cannot be deleted.
 
 ### Editing the grid
 
