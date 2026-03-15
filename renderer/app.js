@@ -78,6 +78,12 @@ class DeckGrid {
     // ── Drag-and-drop state ──────────────────────────────────────────
     this.dragSourceKey = null;
 
+    // ── Copy/paste clipboard (in-memory) ─────────────────────────────
+    this._clipboard = null;     // Deep copy of a button config, or null
+
+    // ── Context menu state ───────────────────────────────────────────
+    this._ctxMenuKey = null;    // Grid key the context menu was opened on
+
     // ── Editor state ─────────────────────────────────────────────────
     this.editorKey = null;          // Grid position key being edited
     this.editorVisualState = 'inactive'; // 'inactive' | 'active'
@@ -109,6 +115,7 @@ class DeckGrid {
     this._bindObsModal();
     this._bindRemoteModal();
     this._bindEditorModal();
+    this._bindContextMenu();
     this._bindGlobalHotkeys();
     this._renderGrid();
     this._applyGridLayout();
@@ -695,6 +702,11 @@ class DeckGrid {
     btn.addEventListener('click', () => {
       if (this.editMode) this._openEditor(key);
     });
+    btn.addEventListener('contextmenu', (e) => {
+      if (!this.editMode) return;
+      e.preventDefault();
+      this._showContextMenu(key, e.clientX, e.clientY);
+    });
     return btn;
   }
 
@@ -779,6 +791,12 @@ class DeckGrid {
       }
     });
 
+    el.addEventListener('contextmenu', (e) => {
+      if (!this.editMode) return;
+      e.preventDefault();
+      this._showContextMenu(key, e.clientX, e.clientY);
+    });
+
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         if (this.editMode) {
@@ -848,6 +866,101 @@ class DeckGrid {
     this._saveConfig();
     this._renderGrid();
     this._applyGridLayout();
+  }
+
+  // ─── Context menu (right-click on buttons in edit mode) ────────────────────
+
+  _bindContextMenu() {
+    const menu = document.getElementById('btn-context-menu');
+
+    document.getElementById('ctx-copy').addEventListener('click', () => {
+      this._copyButton(this._ctxMenuKey);
+      this._hideContextMenu();
+    });
+
+    document.getElementById('ctx-paste').addEventListener('click', () => {
+      this._pasteButton(this._ctxMenuKey);
+      this._hideContextMenu();
+    });
+
+    document.getElementById('ctx-delete').addEventListener('click', () => {
+      this._deleteButton(this._ctxMenuKey);
+      this._hideContextMenu();
+    });
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+      if (!menu.classList.contains('hidden') && !menu.contains(e.target)) {
+        this._hideContextMenu();
+      }
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !menu.classList.contains('hidden')) {
+        this._hideContextMenu();
+      }
+    });
+  }
+
+  _showContextMenu(key, x, y) {
+    this._ctxMenuKey = key;
+    const menu = document.getElementById('btn-context-menu');
+    const pasteBtn = document.getElementById('ctx-paste');
+    const deleteBtn = document.getElementById('ctx-delete');
+    const hasButton = !!this._currentPageButtons()[key];
+
+    // Paste is only available when the clipboard has data
+    pasteBtn.disabled = this._clipboard === null;
+
+    // Delete is only meaningful when a button exists at this position
+    deleteBtn.disabled = !hasButton;
+
+    // Position the menu, keeping it inside the viewport
+    menu.classList.remove('hidden');
+    const menuW = menu.offsetWidth;
+    const menuH = menu.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    menu.style.left = `${Math.min(x, vw - menuW - 4)}px`;
+    menu.style.top  = `${Math.min(y, vh - menuH - 4)}px`;
+  }
+
+  _hideContextMenu() {
+    document.getElementById('btn-context-menu').classList.add('hidden');
+    this._ctxMenuKey = null;
+  }
+
+  _copyButton(key) {
+    const btn = this._currentPageButtons()[key];
+    if (!btn) return;
+    this._clipboard = this._deepClone(btn);
+    this._showToast('Button copied', 'success');
+  }
+
+  _pasteButton(key) {
+    if (!this._clipboard) return;
+    this._currentPageButtons()[key] = this._deepClone(this._clipboard);
+    this._saveConfig();
+    this._refreshButton(key);
+    this._showToast('Button pasted', 'success');
+  }
+
+  _deleteButton(key) {
+    const pageButtons = this._currentPageButtons();
+    if (!pageButtons[key]) return;
+    delete pageButtons[key];
+    this._saveConfig();
+    const cell = document.querySelector(`.grid-cell[data-key="${CSS.escape(key)}"]`);
+    if (cell) {
+      cell.innerHTML = '';
+      cell.appendChild(this._buildEmptyCell(key));
+      this._bindCellDrop(cell);
+    }
+  }
+
+  _deepClone(obj) {
+    return JSON.parse(JSON.stringify(obj));
   }
 
   // ─── Active state detection ────────────────────────────────────────────────
@@ -933,7 +1046,7 @@ class DeckGrid {
   // ─── Refresh a single button's visual state ────────────────────────────────
   _refreshButton(key) {
     const btnConfig = this._currentPageButtons()[key];
-    const cell = document.querySelector(`.grid-cell[data-key="${key}"]`);
+    const cell = document.querySelector(`.grid-cell[data-key="${CSS.escape(key)}"]`);
     if (!cell || !btnConfig) return;
     cell.innerHTML = '';
     cell.appendChild(this._buildDeckButton(key, btnConfig));
