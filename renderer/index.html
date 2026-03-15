@@ -90,6 +90,26 @@
     <!-- ── Page Bar ───────────────────────────────────────────────────── -->
     <div id="page-bar"></div>
 
+    <!-- ── Rename Profile Modal ─────────────────────────────────────── -->
+    <div id="rename-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="rename-modal-title">
+      <div class="modal-box" style="max-width:360px">
+        <div class="modal-header">
+          <h2 id="rename-modal-title"><i class="fa-solid fa-pen"></i> Rename Profile</h2>
+          <button class="modal-close" id="rename-modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="rename-profile-input">Profile name</label>
+            <input type="text" id="rename-profile-input" maxlength="64" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="rename-cancel" class="btn-secondary">Cancel</button>
+          <button id="rename-confirm" class="btn-primary"><i class="fa-solid fa-check"></i> Rename</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ── OBS Connect Modal ──────────────────────────────────────────── -->
     <div id="obs-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="obs-modal-title">
       <div class="modal-box">

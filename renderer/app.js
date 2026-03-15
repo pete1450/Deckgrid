@@ -580,8 +580,44 @@ class DeckGrid {
     if (renameBtn) {
       renameBtn.addEventListener('click', () => {
         const current = this._activeProfile();
-        const newName = window.prompt('Profile name:', current.name);
+        this._openRenameModal(current.name);
+      });
+    }
+
+    // Rename modal
+    const renameModal   = document.getElementById('rename-modal');
+    const renameInput   = document.getElementById('rename-profile-input');
+    const renameConfirm = document.getElementById('rename-confirm');
+    const renameCancel  = document.getElementById('rename-cancel');
+    const renameClose   = document.getElementById('rename-modal-close');
+
+    const closeRenameModal = () => renameModal.classList.add('hidden');
+
+    this._openRenameModal = (currentName) => {
+      renameInput.value = currentName;
+      renameModal.classList.remove('hidden');
+      renameInput.focus();
+      renameInput.select();
+    };
+
+    if (renameConfirm) {
+      renameConfirm.addEventListener('click', () => {
+        const newName = renameInput.value;
         if (newName !== null) this._renameProfile(this.config.activeProfileIndex, newName);
+        closeRenameModal();
+      });
+    }
+    if (renameCancel)  renameCancel.addEventListener('click',  closeRenameModal);
+    if (renameClose)   renameClose.addEventListener('click',   closeRenameModal);
+    if (renameModal) {
+      renameModal.addEventListener('click', (e) => {
+        if (e.target === renameModal) closeRenameModal();
+      });
+    }
+    if (renameInput) {
+      renameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter')  renameConfirm.click();
+        if (e.key === 'Escape') closeRenameModal();
       });
     }
 
