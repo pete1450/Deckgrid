@@ -651,12 +651,11 @@ class DeckGrid {
     }
 
     if (delBtn) {
-      delBtn.addEventListener('click', () => {
+      delBtn.addEventListener('click', async () => {
         if (this.config.profiles.length <= 1) return;
         const current = this._activeProfile();
-        if (window.confirm(`Delete profile "${current.name}"? This cannot be undone.`)) {
-          this._removeProfile(this.config.activeProfileIndex);
-        }
+        const confirmed = await this._confirm(`Delete profile "${current.name}"? This cannot be undone.`);
+        if (confirmed) this._removeProfile(this.config.activeProfileIndex);
       });
     }
   }
