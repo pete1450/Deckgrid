@@ -26,6 +26,18 @@
           <i class="fa-solid fa-play"></i>
           <span>Operations</span>
         </button>
+        <div id="profile-controls" class="profile-controls">
+          <select id="profile-select" class="profile-select" title="Switch profile"></select>
+          <button id="profile-add-btn" class="btn-secondary btn-sm hidden" title="New profile">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+          <button id="profile-rename-btn" class="btn-secondary btn-sm hidden" title="Rename profile">
+            <i class="fa-solid fa-pen"></i>
+          </button>
+          <button id="profile-delete-btn" class="btn-danger btn-sm hidden" title="Delete profile">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
       </div>
 
       <div id="grid-controls" class="topbar-center hidden">
@@ -77,6 +89,26 @@
 
     <!-- ── Page Bar ───────────────────────────────────────────────────── -->
     <div id="page-bar"></div>
+
+    <!-- ── Rename Profile Modal ─────────────────────────────────────── -->
+    <div id="rename-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="rename-modal-title">
+      <div class="modal-box" style="max-width:360px">
+        <div class="modal-header">
+          <h2 id="rename-modal-title"><i class="fa-solid fa-pen"></i> Rename Profile</h2>
+          <button class="modal-close" id="rename-modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="rename-profile-input">Profile name</label>
+            <input type="text" id="rename-profile-input" maxlength="64" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="rename-cancel" class="btn-secondary">Cancel</button>
+          <button id="rename-confirm" class="btn-primary"><i class="fa-solid fa-check"></i> Rename</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ── OBS Connect Modal ──────────────────────────────────────────── -->
     <div id="obs-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="obs-modal-title">
